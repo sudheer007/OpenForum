@@ -48,7 +48,7 @@ impl PerformCrud for Register {
     let data: &Register = self;
 
     // Make sure site has open registration
-    if let Ok(site) = blocking(context.pool(), move |conn| Site::read_simple(conn)).await? {
+    if let Ok(site) = blocking(context.pool(), move |conn| Site::read_local_site(conn)).await? {
       if !site.open_registration {
         return Err(ApiError::err("registration_closed").into());
       }

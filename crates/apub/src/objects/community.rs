@@ -1,18 +1,31 @@
 use crate::{
+  check_is_apub_id_valid,
   extensions::{context::lemmy_context, signatures::PublicKey},
-  fetcher::community::{fetch_community_outbox, update_community_mods},
+  fetcher::{
+    community::{fetch_community_outbox, update_community_mods},
+    object_id::ObjectId,
+  },
   generate_moderators_url,
-  objects::{create_tombstone, FromApub, ImageObject, Source, ToApub},
+  objects::{
+    create_tombstone,
+    instance::instance_actor_id_from_url,
+    FromApub,
+    ImageObject,
+    Source,
+    ToApub,
+  },
   ActorType,
+  CommunityType,
 };
 use activitystreams::{
   actor::{kind::GroupType, Endpoints},
   base::AnyBase,
-  object::{kind::ImageType, Tombstone},
+  object::Tombstone,
   primitives::OneOrMany,
   unparsed::Unparsed,
 };
 use chrono::{DateTime, FixedOffset};
+use itertools::Itertools;
 use lemmy_api_common::blocking;
 use lemmy_apub_lib::{
   values::{MediaTypeHtml, MediaTypeMarkdown},
@@ -21,14 +34,19 @@ use lemmy_apub_lib::{
 use lemmy_db_queries::{source::community::Community_, DbPool};
 use lemmy_db_schema::{
   naive_now,
-  source::community::{Community, CommunityForm},
+  source::{
+    community::{Community, CommunityForm},
+    site::Site,
+  },
 };
+use lemmy_db_views_actor::community_follower_view::CommunityFollowerView;
 use lemmy_utils::{
   settings::structs::Settings,
   utils::{check_slurs, check_slurs_opt, convert_datetime, markdown_to_html},
   LemmyError,
 };
 use lemmy_websocket::LemmyContext;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -65,6 +83,64 @@ pub struct Group {
   updated: Option<DateTime<FixedOffset>>,
   #[serde(flatten)]
   unparsed: Unparsed,
+}
+
+impl ActorType for Community {
+  fn is_local(&self) -> bool {
+    self.local
+  }
+  fn actor_id(&self) -> Url {
+    self.actor_id.to_owned().into()
+  }
+  fn name(&self) -> String {
+    self.name.clone()
+  }
+  fn public_key(&self) -> Option<String> {
+    self.public_key.to_owned()
+  }
+  fn private_key(&self) -> Option<String> {
+    self.private_key.to_owned()
+  }
+
+  fn get_shared_inbox_or_inbox_url(&self) -> Url {
+    self
+      .shared_inbox_url
+      .clone()
+      .unwrap_or_else(|| self.inbox_url.to_owned())
+      .into()
+  }
+}
+
+#[async_trait::async_trait(?Send)]
+impl CommunityType for Community {
+  fn followers_url(&self) -> Url {
+    self.followers_url.clone().into()
+  }
+
+  /// For a given community, returns the inboxes of all followers.
+  async fn get_follower_inboxes(
+    &self,
+    pool: &DbPool,
+    settings: &Settings,
+  ) -> Result<Vec<Url>, LemmyError> {
+    let id = self.id;
+
+    let follows = blocking(pool, move |conn| {
+      CommunityFollowerView::for_community(conn, id)
+    })
+    .await??;
+    let inboxes = follows
+      .into_iter()
+      .filter(|f| !f.follower.local)
+      .map(|f| f.follower.shared_inbox_url.unwrap_or(f.follower.inbox_url))
+      .map(|i| i.into_inner())
+      .unique()
+      // Don't send to blocked instances
+      .filter(|inbox| check_is_apub_id_valid(inbox, false, settings).is_ok())
+      .collect();
+
+    Ok(inboxes)
+  }
 }
 
 impl Group {
@@ -120,14 +196,6 @@ impl ToApub for Community {
       content: bio,
       media_type: MediaTypeMarkdown::Markdown,
     });
-    let icon = self.icon.clone().map(|url| ImageObject {
-      kind: ImageType::Image,
-      url: url.into(),
-    });
-    let image = self.banner.clone().map(|url| ImageObject {
-      kind: ImageType::Image,
-      url: url.into(),
-    });
 
     let group = Group {
       context: lemmy_context(),
@@ -138,8 +206,8 @@ impl ToApub for Community {
       content: self.description.as_ref().map(|b| markdown_to_html(b)),
       media_type: self.description.as_ref().map(|_| MediaTypeHtml::Html),
       source,
-      icon,
-      image,
+      icon: self.icon.clone().map(ImageObject::new),
+      image: self.banner.clone().map(ImageObject::new),
       sensitive: Some(self.nsfw),
       moderators: Some(generate_moderators_url(&self.actor_id)?.into()),
       inbox: self.inbox_url.clone().into(),
@@ -185,6 +253,15 @@ impl FromApub for Community {
 
     // TODO: doing this unconditionally might cause infinite loop for some reason
     fetch_community_outbox(context, &group.outbox, request_counter).await?;
+
+    // try to fetch the instance actor (to make things like instance rules available)
+    let instance_id = instance_actor_id_from_url(community.actor_id.clone().into());
+    let site = ObjectId::<Site>::new(instance_id.clone())
+      .dereference(context, request_counter)
+      .await;
+    if let Err(e) = site {
+      warn!("Failed to dereference site for {}: {}", instance_id, e);
+    }
 
     Ok(community)
   }

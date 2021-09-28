@@ -12,6 +12,7 @@ use url::Url;
 
 pub(crate) mod comment;
 pub(crate) mod community;
+pub(crate) mod instance;
 pub(crate) mod person;
 pub(crate) mod post;
 pub(crate) mod private_message;
@@ -56,6 +57,18 @@ pub struct ImageObject {
   #[serde(rename = "type")]
   kind: ImageType,
   url: Url,
+}
+
+impl ImageObject {
+  fn new<T>(url: T) -> Self
+  where
+    T: Into<Url>,
+  {
+    ImageObject {
+      kind: ImageType::Image,
+      url: url.into(),
+    }
+  }
 }
 
 /// Updated is actually the deletion time

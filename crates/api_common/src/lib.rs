@@ -372,7 +372,7 @@ pub async fn check_person_block(
 
 pub async fn check_downvotes_enabled(score: i16, pool: &DbPool) -> Result<(), LemmyError> {
   if score == -1 {
-    let site = blocking(pool, move |conn| Site::read_simple(conn)).await??;
+    let site = blocking(pool, move |conn| Site::read_local_site(conn)).await??;
     if !site.enable_downvotes {
       return Err(ApiError::err("downvotes_disabled").into());
     }

@@ -35,6 +35,7 @@ mod community;
 mod person;
 mod post;
 pub mod routes;
+pub mod site;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ActivityHandler, ActivityFields)]
 #[serde(untagged)]

@@ -24,6 +24,7 @@ use lemmy_db_queries::{
     person_mention::PersonMention_,
     post::Post_,
     private_message::PrivateMessage_,
+    site::Site_,
   },
   Blockable,
   Crud,
@@ -371,7 +372,7 @@ impl Perform for AddAdmin {
     blocking(context.pool(), move |conn| ModAdd::create(conn, &form)).await??;
 
     let site_creator_id = blocking(context.pool(), move |conn| {
-      Site::read(conn, 1).map(|s| s.creator_id)
+      Site::read_local_site(conn).map(|s| s.creator_id)
     })
     .await??;
 

@@ -39,7 +39,7 @@ impl PerformCrud for EditSite {
     // Make sure user is an admin
     is_admin(&local_user_view)?;
 
-    let found_site = blocking(context.pool(), move |conn| Site::read_simple(conn)).await??;
+    let found_site = blocking(context.pool(), move |conn| Site::read_local_site(conn)).await??;
 
     let sidebar = diesel_option_overwrite(&data.sidebar);
     let description = diesel_option_overwrite(&data.description);
@@ -62,6 +62,11 @@ impl PerformCrud for EditSite {
       open_registration: data.open_registration,
       enable_nsfw: data.enable_nsfw,
       community_creation_admin_only: data.community_creation_admin_only,
+      actor_id: None,
+      last_refreshed_at: Some(naive_now()),
+      inbox_url: None,
+      private_key: None,
+      public_key: None,
     };
 
     let update_site = move |conn: &'_ _| Site::update(conn, 1, &site_form);

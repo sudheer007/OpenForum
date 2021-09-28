@@ -13,6 +13,7 @@ use crate::{
     person::{get_apub_person_http, get_apub_person_inbox, get_apub_person_outbox, person_inbox},
     post::get_apub_post,
     shared_inbox,
+    site::get_apub_site_http,
   },
   APUB_JSON_CONTENT_TYPE,
 };
@@ -39,6 +40,7 @@ pub fn config(cfg: &mut web::ServiceConfig, settings: &Settings) {
       .service(
         web::scope("")
           .guard(header_guard_accept)
+          .route("", web::get().to(get_apub_site_http))
           .route(
             "/c/{community_name}",
             web::get().to(get_apub_community_http),

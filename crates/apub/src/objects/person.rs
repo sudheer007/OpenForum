@@ -8,7 +8,7 @@ use activitystreams::{
   actor::Endpoints,
   base::AnyBase,
   chrono::{DateTime, FixedOffset},
-  object::{kind::ImageType, Tombstone},
+  object::Tombstone,
   primitives::OneOrMany,
   unparsed::Unparsed,
 };
@@ -69,6 +69,34 @@ pub struct Person {
   unparsed: Unparsed,
 }
 
+impl ActorType for DbPerson {
+  fn is_local(&self) -> bool {
+    self.local
+  }
+  fn actor_id(&self) -> Url {
+    self.actor_id.to_owned().into_inner()
+  }
+  fn name(&self) -> String {
+    self.name.clone()
+  }
+
+  fn public_key(&self) -> Option<String> {
+    self.public_key.to_owned()
+  }
+
+  fn private_key(&self) -> Option<String> {
+    self.private_key.to_owned()
+  }
+
+  fn get_shared_inbox_or_inbox_url(&self) -> Url {
+    self
+      .shared_inbox_url
+      .clone()
+      .unwrap_or_else(|| self.inbox_url.to_owned())
+      .into()
+  }
+}
+
 // TODO: can generate this with a derive macro
 impl Person {
   pub(crate) fn id(&self, expected_domain: &Url) -> Result<&Url, LemmyError> {
@@ -91,14 +119,6 @@ impl ToApub for DbPerson {
       content: bio,
       media_type: MediaTypeMarkdown::Markdown,
     });
-    let icon = self.avatar.clone().map(|url| ImageObject {
-      kind: ImageType::Image,
-      url: url.into(),
-    });
-    let image = self.banner.clone().map(|url| ImageObject {
-      kind: ImageType::Image,
-      url: url.into(),
-    });
 
     let person = Person {
       context: lemmy_context(),
@@ -109,8 +129,8 @@ impl ToApub for DbPerson {
       content: self.bio.as_ref().map(|b| markdown_to_html(b)),
       media_type: self.bio.as_ref().map(|_| MediaTypeHtml::Html),
       source,
-      icon,
-      image,
+      icon: self.avatar.clone().map(ImageObject::new),
+      image: self.banner.clone().map(ImageObject::new),
       matrix_user_id: self.matrix_user_id.clone(),
       published: convert_datetime(self.published),
       outbox: self.get_outbox_url()?,

@@ -17,9 +17,14 @@ pub struct Site {
   pub banner: Option<DbUrl>,
   pub description: Option<String>,
   pub community_creation_admin_only: bool,
+  pub actor_id: DbUrl,
+  pub last_refreshed_at: chrono::NaiveDateTime,
+  pub inbox_url: DbUrl,
+  pub private_key: Option<String>,
+  pub public_key: String,
 }
 
-#[derive(Insertable, AsChangeset)]
+#[derive(Insertable, AsChangeset, Default)]
 #[table_name = "site"]
 pub struct SiteForm {
   pub name: String,
@@ -34,4 +39,9 @@ pub struct SiteForm {
   pub banner: Option<Option<DbUrl>>,
   pub description: Option<Option<String>>,
   pub community_creation_admin_only: Option<bool>,
+  pub actor_id: Option<DbUrl>,
+  pub last_refreshed_at: Option<chrono::NaiveDateTime>,
+  pub inbox_url: Option<DbUrl>,
+  pub private_key: Option<Option<String>>,
+  pub public_key: Option<String>,
 }

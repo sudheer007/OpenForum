@@ -447,6 +447,11 @@ table! {
         banner -> Nullable<Varchar>,
         description -> Nullable<Text>,
         community_creation_admin_only -> Bool,
+        actor_id -> Text,
+        last_refreshed_at -> Timestamp,
+        inbox_url -> Text,
+        private_key -> Nullable<Text>,
+        public_key -> Text,
     }
 }
 

@@ -13,7 +13,14 @@ use lemmy_apub::{
   generate_shared_inbox_url,
   EndpointType,
 };
-use lemmy_db_queries::{diesel_option_overwrite_to_url, ApubObject, Crud, Followable, Joinable};
+use lemmy_db_queries::{
+  diesel_option_overwrite_to_url,
+  source::site::Site_,
+  ApubObject,
+  Crud,
+  Followable,
+  Joinable,
+};
 use lemmy_db_schema::source::{
   community::{
     Community,
@@ -48,7 +55,7 @@ impl PerformCrud for CreateCommunity {
     let local_user_view =
       get_local_user_view_from_jwt(&data.auth, context.pool(), context.secret()).await?;
 
-    let site = blocking(context.pool(), move |conn| Site::read(conn, 0)).await??;
+    let site = blocking(context.pool(), move |conn| Site::read_local_site(conn)).await??;
     if site.community_creation_admin_only && is_admin(&local_user_view).is_err() {
       return Err(ApiError::err("only_admins_can_create_communities").into());
     }

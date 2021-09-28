@@ -18,7 +18,7 @@ use lemmy_apub::activities::{
   following::{follow::FollowCommunity as FollowCommunityApub, undo::UndoFollowCommunity},
 };
 use lemmy_db_queries::{
-  source::{comment::Comment_, community::CommunityModerator_, post::Post_},
+  source::{comment::Comment_, community::CommunityModerator_, post::Post_, site::Site_},
   Bannable,
   Blockable,
   Crud,
@@ -405,7 +405,7 @@ impl Perform for TransferCommunity {
       get_local_user_view_from_jwt(&data.auth, context.pool(), context.secret()).await?;
 
     let site_creator_id = blocking(context.pool(), move |conn| {
-      Site::read(conn, 1).map(|s| s.creator_id)
+      Site::read_local_site(conn).map(|s| s.creator_id)
     })
     .await??;
 

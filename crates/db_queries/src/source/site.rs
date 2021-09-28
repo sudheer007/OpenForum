@@ -1,13 +1,13 @@
-use crate::Crud;
+use crate::{ApubObject, Crud};
+use chrono::NaiveDateTime;
 use diesel::{dsl::*, result::Error, *};
-use lemmy_db_schema::{naive_now, source::site::*, PersonId};
+use lemmy_db_schema::{naive_now, source::site::*, DbUrl, PersonId};
 
 impl Crud for Site {
   type Form = SiteForm;
   type IdType = i32;
-  fn read(conn: &PgConnection, _site_id: i32) -> Result<Self, Error> {
-    use lemmy_db_schema::schema::site::dsl::*;
-    site.first::<Self>(conn)
+  fn read(_conn: &PgConnection, _site_id: i32) -> Result<Self, Error> {
+    unimplemented!()
   }
 
   fn create(conn: &PgConnection, new_site: &SiteForm) -> Result<Self, Error> {
@@ -29,7 +29,8 @@ impl Crud for Site {
 
 pub trait Site_ {
   fn transfer(conn: &PgConnection, new_creator_id: PersonId) -> Result<Site, Error>;
-  fn read_simple(conn: &PgConnection) -> Result<Site, Error>;
+  fn read_local_site(conn: &PgConnection) -> Result<Site, Error>;
+  fn upsert(conn: &PgConnection, site_form: &SiteForm) -> Result<Site, Error>;
 }
 
 impl Site_ for Site {
@@ -40,8 +41,29 @@ impl Site_ for Site {
       .get_result::<Self>(conn)
   }
 
-  fn read_simple(conn: &PgConnection) -> Result<Self, Error> {
+  fn read_local_site(conn: &PgConnection) -> Result<Self, Error> {
     use lemmy_db_schema::schema::site::dsl::*;
-    site.first::<Self>(conn)
+    site.order_by(id).first::<Self>(conn)
+  }
+
+  fn upsert(conn: &PgConnection, site_form: &SiteForm) -> Result<Site, Error> {
+    use lemmy_db_schema::schema::site::dsl::*;
+    insert_into(site)
+      .values(site_form)
+      .on_conflict(actor_id)
+      .do_update()
+      .set(site_form)
+      .get_result::<Self>(conn)
+  }
+}
+
+impl ApubObject for Site {
+  fn last_refreshed_at(&self) -> Option<NaiveDateTime> {
+    Some(self.last_refreshed_at)
+  }
+
+  fn read_from_apub_id(conn: &PgConnection, object_id: &DbUrl) -> Result<Self, Error> {
+    use lemmy_db_schema::schema::site::dsl::*;
+    site.filter(actor_id.eq(object_id)).first::<Self>(conn)
   }
 }

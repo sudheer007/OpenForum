@@ -1,6 +1,5 @@
 use crate::Perform;
 use actix_web::web::Data;
-use anyhow::Context;
 use diesel::NotFound;
 use lemmy_api_common::{
   blocking,
@@ -17,7 +16,6 @@ use lemmy_apub::{
 };
 use lemmy_db_queries::{
   from_opt_str_to_opt_enum,
-  source::site::Site_,
   Crud,
   DbPool,
   DeleteableOrRemoveable,
@@ -25,10 +23,7 @@ use lemmy_db_queries::{
   SearchType,
   SortType,
 };
-use lemmy_db_schema::{
-  source::{moderator::*, site::Site},
-  PersonId,
-};
+use lemmy_db_schema::{source::moderator::*, PersonId};
 use lemmy_db_views::{
   comment_view::{CommentQueryBuilder, CommentView},
   post_view::{PostQueryBuilder, PostView},
@@ -50,14 +45,7 @@ use lemmy_db_views_moderator::{
   mod_sticky_post_view::ModStickyPostView,
   mod_transfer_community_view::ModTransferCommunityView,
 };
-use lemmy_utils::{
-  location_info,
-  settings::structs::Settings,
-  version,
-  ApiError,
-  ConnectionId,
-  LemmyError,
-};
+use lemmy_utils::{settings::structs::Settings, version, ApiError, ConnectionId, LemmyError};
 use lemmy_websocket::LemmyContext;
 
 #[async_trait::async_trait(?Send)]
@@ -444,24 +432,12 @@ impl Perform for TransferSite {
     context: &Data<LemmyContext>,
     _websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteResponse, LemmyError> {
+    // TODO: fix this to account for site.creator_id being removed, should be similar to TransferCommunity
     let data: &TransferSite = self;
     let local_user_view =
       get_local_user_view_from_jwt(&data.auth, context.pool(), context.secret()).await?;
 
     is_admin(&local_user_view)?;
-
-    let read_site = blocking(context.pool(), move |conn| Site::read_local_site(conn)).await??;
-
-    // Make sure user is the creator
-    if read_site.creator_id != local_user_view.person.id {
-      return Err(ApiError::err("not_an_admin").into());
-    }
-
-    let new_creator_id = data.person_id;
-    let transfer_site = move |conn: &'_ _| Site::transfer(conn, new_creator_id);
-    if blocking(context.pool(), transfer_site).await?.is_err() {
-      return Err(ApiError::err("couldnt_update_site").into());
-    };
 
     // Mod tables
     let form = ModAddForm {
@@ -474,13 +450,7 @@ impl Perform for TransferSite {
 
     let site_view = blocking(context.pool(), move |conn| SiteView::read(conn)).await??;
 
-    let mut admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
-    let creator_index = admins
-      .iter()
-      .position(|r| r.person.id == site_view.creator.id)
-      .context(location_info!())?;
-    let creator_person = admins.remove(creator_index);
-    admins.insert(0, creator_person);
+    let admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
 
     let banned = blocking(context.pool(), move |conn| PersonViewSafe::banned(conn)).await??;
     let federated_instances = build_federated_instances(

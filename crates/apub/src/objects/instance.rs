@@ -120,7 +120,6 @@ impl FromApub for Site {
     let site_form = SiteForm {
       name: instance.name.clone(),
       sidebar: Some(instance.content.clone()),
-      creator_id: Default::default(),
       updated: instance.updated.map(|u| u.clone().naive_local()),
       enable_downvotes: None,
       open_registration: None,

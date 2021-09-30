@@ -40,7 +40,7 @@ pub fn config(cfg: &mut web::ServiceConfig, settings: &Settings) {
       .service(
         web::scope("")
           .guard(header_guard_accept)
-          .route("", web::get().to(get_apub_site_http))
+          .route("/", web::get().to(get_apub_site_http))
           .route(
             "/c/{community_name}",
             web::get().to(get_apub_community_http),

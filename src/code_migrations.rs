@@ -305,7 +305,6 @@ fn instance_actor_2021_09_29(
     let actor_id = Url::parse(protocol_and_hostname)?;
     let site_form = SiteForm {
       name: site.name,
-      creator_id: site.creator_id,
       actor_id: Some(actor_id.clone().into()),
       last_refreshed_at: Some(naive_now()),
       inbox_url: Some(generate_inbox_url(&actor_id.into())?),

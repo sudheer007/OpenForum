@@ -1,7 +1,7 @@
 use crate::{ApubObject, Crud};
 use chrono::NaiveDateTime;
 use diesel::{dsl::*, result::Error, *};
-use lemmy_db_schema::{naive_now, source::site::*, DbUrl, PersonId};
+use lemmy_db_schema::{source::site::*, DbUrl};
 
 impl Crud for Site {
   type Form = SiteForm;
@@ -28,19 +28,11 @@ impl Crud for Site {
 }
 
 pub trait Site_ {
-  fn transfer(conn: &PgConnection, new_creator_id: PersonId) -> Result<Site, Error>;
   fn read_local_site(conn: &PgConnection) -> Result<Site, Error>;
   fn upsert(conn: &PgConnection, site_form: &SiteForm) -> Result<Site, Error>;
 }
 
 impl Site_ for Site {
-  fn transfer(conn: &PgConnection, new_creator_id: PersonId) -> Result<Site, Error> {
-    use lemmy_db_schema::schema::site::dsl::*;
-    diesel::update(site.find(1))
-      .set((creator_id.eq(new_creator_id), updated.eq(naive_now())))
-      .get_result::<Self>(conn)
-  }
-
   fn read_local_site(conn: &PgConnection) -> Result<Self, Error> {
     use lemmy_db_schema::schema::site::dsl::*;
     site.order_by(id).first::<Self>(conn)

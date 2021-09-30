@@ -18,7 +18,7 @@ use lemmy_apub::activities::{
   following::{follow::FollowCommunity as FollowCommunityApub, undo::UndoFollowCommunity},
 };
 use lemmy_db_queries::{
-  source::{comment::Comment_, community::CommunityModerator_, post::Post_, site::Site_},
+  source::{comment::Comment_, community::CommunityModerator_, post::Post_},
   Bannable,
   Blockable,
   Crud,
@@ -32,7 +32,6 @@ use lemmy_db_schema::source::{
   moderator::*,
   person::Person,
   post::Post,
-  site::*,
 };
 use lemmy_db_views::comment_view::CommentQueryBuilder;
 use lemmy_db_views_actor::{
@@ -404,20 +403,7 @@ impl Perform for TransferCommunity {
     let local_user_view =
       get_local_user_view_from_jwt(&data.auth, context.pool(), context.secret()).await?;
 
-    let site_creator_id = blocking(context.pool(), move |conn| {
-      Site::read_local_site(conn).map(|s| s.creator_id)
-    })
-    .await??;
-
-    let mut admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
-
-    // Making sure the site creator, if an admin, is at the top
-    let creator_index = admins
-      .iter()
-      .position(|r| r.person.id == site_creator_id)
-      .context(location_info!())?;
-    let creator_person = admins.remove(creator_index);
-    admins.insert(0, creator_person);
+    let admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
 
     // Fetch the community mods
     let community_id = data.community_id;

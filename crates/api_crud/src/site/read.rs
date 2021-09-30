@@ -68,18 +68,7 @@ impl PerformCrud for GetSite {
       }
     };
 
-    let mut admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
-
-    // Make sure the site creator is the top admin
-    if let Some(site_view) = site_view.to_owned() {
-      let site_creator_id = site_view.creator.id;
-      // TODO investigate why this is sometimes coming back null
-      // Maybe user_.admin isn't being set to true?
-      if let Some(creator_index) = admins.iter().position(|r| r.person.id == site_creator_id) {
-        let creator_person = admins.remove(creator_index);
-        admins.insert(0, creator_person);
-      }
-    }
+    let admins = blocking(context.pool(), move |conn| PersonViewSafe::admins(conn)).await??;
 
     let banned = blocking(context.pool(), move |conn| PersonViewSafe::banned(conn)).await??;
 
